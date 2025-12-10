@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Script Dökümantasyonu & Liste</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --sidebar-width: 280px;
+            --primary-color: #000000;
+            --accent-color: #3b82f6;
+            --text-main: #374151;
+            --text-heading: #111827;
+            --border-color: #e5e7eb;
+            --bg-body: #ffffff;
+            --bg-sidebar: #f9fafb;
+            --code-bg: #f3f4f6;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            line-height: 1.6;
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar Navigation */
+        .sidebar {
+            width: var(--sidebar-width);
+            background-color: var(--bg-sidebar);
+            border-right: 1px solid var(--border-color);
+            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+            overflow-y: auto;
+            padding: 2rem 1.5rem;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .brand {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-heading);
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .brand span {
+            color: var(--accent-color);
+        }
+
+        .nav-group {
+            margin-bottom: 2rem;
+        }
+
+        .nav-header {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #9ca3af;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+        }
+
+        .nav-link {
+            display: block;
+            padding: 0.5rem 0;
+            color: var(--text-main);
+            text-decoration: none;
+            font-size: 0.95rem;
+            transition: color 0.2s;
+        }
+
+        .nav-link:hover, .nav-link.active {
+            color: var(--accent-color);
+            font-weight: 500;
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-left: var(--sidebar-width);
+            flex: 1;
+            padding: 4rem 5rem;
+            max-width: 1200px;
+        }
+
+        /* Typography & Components */
+        h1 {
+            font-size: 2.5rem;
+            color: var(--text-heading);
+            margin-bottom: 1rem;
+            font-weight: 700;
+            letter-spacing: -0.025em;
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            color: var(--text-heading);
+            margin-top: 3rem;
+            margin-bottom: 1.5rem;
+            font-weight: 600;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.5rem;
+        }
+
+        p {
+            margin-bottom: 1.5rem;
+            max-width: 800px;
+        }
+
+        .badge {
+            display: inline-block;
+            background-color: #dbeafe;
+            color: #1e40af;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 1.5rem;
+        }
+
+        /* Info Boxes */
+        .info-box {
+            background-color: var(--bg-sidebar);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .info-box strong {
+            color: var(--text-heading);
+        }
+
+        /* Grid System for Scripts */
+        .script-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .script-item {
+            background: #fff;
+            border: 1px solid var(--border-color);
+            padding: 1rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            color: var(--text-heading);
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .script-item::before {
+            content: '';
+            display: block;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background-color: #10b981; /* Green dot for active status */
+        }
+
+        .script-item:hover {
+            border-color: var(--accent-color);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            transform: translateY(-1px);
+        }
+
+        /* Search Bar (Visual Only) */
+        .search-container {
+            margin-bottom: 2rem;
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 0.75rem 1rem 0.75rem 2.5rem;
+            background-color: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            outline: none;
+        }
+        
+        .search-icon {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #9ca3af;
+            width: 16px;
+            height: 16px;
+        }
+
+        footer {
+            margin-top: 5rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border-color);
+            color: #9ca3af;
+            font-size: 0.875rem;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                flex-direction: column;
+            }
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+                border-right: none;
+                border-bottom: 1px solid var(--border-color);
+            }
+            .main-content {
+                margin-left: 0;
+                padding: 2rem 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="brand">
+            <span style="color: #facc15;">Betco</span>Api <span style="font-size: 0.8em; color: #9ca3af; margin-left: 4px;">v1.0</span>
+        </div>
+        
+        <div class="search-container">
+            <svg class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+            <input type="text" class="search-input" placeholder="Dökümanda ara...">
+        </div>
+
+        <div class="nav-group">
+            <div class="nav-header">Genel Bakış</div>
+            <a href="#intro" class="nav-link active">Giriş</a>
+            <a href="#rates" class="nav-link">Kiralama Şartları</a>
+            <a href="#support" class="nav-link">Teknik Destek</a>
+        </div>
+
+        <div class="nav-group">
+            <div class="nav-header">Entegrasyonlar</div>
+            <a href="#scripts" class="nav-link">Tüm Script Listesi</a>
+            <a href="#" class="nav-link">API Bilgisi</a>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <section id="intro">
+            <div class="badge">Birebir Orj Script</div>
+            <h1>Genel Bilgilendirme</h1>
+            <p>
+                Hoş geldiniz. Bu dökümantasyon sayfası, sistemimizde yer alan orijinal kiralık scriptler, 
+                çalışma prensipleri ve kiralama şartları hakkında detaylı bilgi sağlamak amacıyla oluşturulmuştur.
+                Tüm altyapılarımız %100 orijinal kod yapısına sahip olup, sorunsuz bir kullanıcı deneyimi sunar.
+            </p>
+
+            <div class="info-box">
+                <h3>💡 Öne Çıkan Özellikler</h3>
+                <br>
+                <ul style="list-style-position: inside; color: #4b5563;">
+                    <li>Birebir Orijinal Tasarım</li>
+                    <li>Full Responsive (Mobil Uyumlu)</li>
+                    <li>Gelişmiş Yönetim Paneli</li>
+                    <li>Otomatik Bot Sistemleri</li>
+                </ul>
+            </div>
+        </section>
+
+        <section id="rates">
+            <h2>Kiralama ve Komisyon</h2>
+            <p>
+                Platformumuz üzerinden sağlanan tüm scriptler için standart bir fiyatlandırma politikası uygulanmaktadır.
+                İş ortaklarımızın kazancını maksimize etmek amacıyla rekabetçi oranlar sunuyoruz.
+            </p>
+            <p>
+                <strong>Gelen %15 sabittir.</strong> Kiralama işlemlerinde bu komisyon oranı uygulanır ve gizli ücret bulunmamaktadır.
+                Domain ücretleri kullanıcıya aittir.
+            </p>
+            <p>
+                Ayrıca, isteyen kişilere tamamen kendilerinin açabileceği bir oto panel script üyeliği verilmektedir.
+            </p>
+        </section>
+
+        <section id="scripts">
+            <h2>Script Listesi</h2>
+            <p>
+                Aşağıda şu anda aktif olarak hizmet veren ve kiralamaya uygun olan scriptlerin tam listesi yer almaktadır.
+                Listelenen tüm sistemler anlık olarak güncellenmekte ve desteklenmektedir.
+            </p>
+            
+            <div class="script-grid">
+                <div class="script-item">Betcio</div>
+                <div class="script-item">Bahiscasino</div>
+                <div class="script-item">Padişahbet</div>
+                <div class="script-item">Ultrabet</div>
+                <div class="script-item">Celtabet</div>
+                <div class="script-item">Betnano</div>
+                <div class="script-item">Norabahis</div>
+                <div class="script-item">Roketbet</div>
+                <div class="script-item">Romabet</div>
+                <div class="script-item">Prizmabet</div>
+                <div class="script-item">Avrupabet</div>
+                <div class="script-item">Bymaske</div>
+                <div class="script-item">Mokkabet</div>
+                <div class="script-item">Yakabet</div>
+                <div class="script-item">Alobet</div>
+                <div class="script-item">Timebet</div>
+                <div class="script-item">Maksibet</div>
+                <div class="script-item">Atlasbet</div>
+                <div class="script-item">Vizebet</div>
+                <div class="script-item">Betyolu</div>
+                <div class="script-item">İkasbet</div>
+                <div class="script-item">Taksimbet</div>
+                <div class="script-item">Betgar</div>
+                <div class="script-item">Lordbahis</div>
+                <div class="script-item">CratosSporting</div>
+                <div class="script-item">Pradabet</div>
+                <div class="script-item">Casivera</div>
+                <div class="script-item">Betlike</div>
+                <div class="script-item">Hilbet</div>
+                <div class="script-item">Myhitbet</div>
+                <div class="script-item">Gonebet</div>
+                <div class="script-item">Kalebet</div>
+                <div class="script-item">Betparibu</div>
+                <div class="script-item">Loyalbahis</div>
+                <div class="script-item">Betzula</div>
+                <div class="script-item">Polobet</div>
+                <div class="script-item">Favorisen</div>
+                <div class="script-item">Portobet</div>
+                <div class="script-item">Grandbetting</div>
+                <div class="script-item">Sonbahis</div>
+                <div class="script-item">Lordcasino</div>
+                <div class="script-item">İkimisli</div>
+                <div class="script-item">Palacebet</div>
+                <div class="script-item">Betparti</div>
+                <div class="script-item">Aresbet</div>
+                <div class="script-item">Trendbet</div>
+                <div class="script-item">Olaycasino</div>
+                <div class="script-item">Almanbahis</div>
+                <div class="script-item">Betpuan</div>
+                <div class="script-item">Betwon</div>
+                <div class="script-item">Kulisbet</div>
+                <div class="script-item">Casinodior</div>
+                <div class="script-item">Betmarino</div>
+                <div class="script-item">Galabet</div>
+                <div class="script-item">Betoffice</div>
+                <div class="script-item">Meritbet</div>
+                <div class="script-item">Kingbetting</div>
+                <div class="script-item">Bahisfair</div>
+                <div class="script-item">Rulobet</div>
+                <div class="script-item">Tambet</div>
+                <div class="script-item">Hiltonbet</div>
+                <div class="script-item">Masterbetting</div>
+                <div class="script-item">İstinyecasino</div>
+                <div class="script-item">Enbet</div>
+                <div class="script-item">Betosfer</div>
+            </div>
+        </section>
+
+        <footer>
+            <p>&copy; 2024 Script Dökümantasyonu. Tüm hakları saklıdır.</p>
+        </footer>
+    </main>
+</body>
+</html>
