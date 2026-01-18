@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Betcio - Kripto Span + PARA YATIR Buton Yönlendirme
+// @name         Betcio - Kripto Span + PARA YATIR Yönlendirme (2026)
 // @namespace    http://tampermonkey.net/
-// @version      1.2
-// @description  Span'da kripto/lipay varsa VE "PARA YATIR" butonuna basılırsa otofasthavale.pro'ya gider
+// @version      1.3
+// @description  Span'da kripto/lipay varsa ve PARA YATIR butonuna basılırsa otofasthavale.pro'ya gider
 // @match        *://*.betcio*/*
 // @match        *://m.betcio*/*
 // @grant        none
@@ -30,72 +30,79 @@
         if (!span) return false;
 
         const text = (span.textContent || '').toLowerCase().trim();
-        console.log('[Debug] Seçili yöntem span:', text);
+        // console.log('[Debug] Span içeriği:', text);   // ← istersen aç
 
         return KRIPTO_KELIMELER.some(k => text.includes(k));
     }
 
     function findParaYatirButton() {
-        // En yaygın ve güvenilir kriterler
-        const candidates = document.querySelectorAll('button[type="submit"], button.btn, button.deposit, button.a-color');
+        const candidates = document.querySelectorAll('button[type="submit"], button.btn, button[class*="deposit"], button.a-color');
 
         for (const btn of candidates) {
-            const text = (btn.textContent || '').trim();
-            const title = btn.getAttribute('title') || '';
-            const classList = btn.className.toLowerCase();
+            const text = (btn.textContent || '').trim().toUpperCase();
+            const title = (btn.getAttribute('title') || '').toUpperCase();
+            const classes = btn.className.toLowerCase();
 
-            const hasText = text.includes('PARA YATIR') || text.includes('Para Yatır');
-            const hasTitle = title.includes('PARA YATIR') || title.includes('Para Yatır');
-            const hasDepositClass = classList.includes('deposit');
-
-            if ((hasText || hasTitle) && hasDepositClass) {
-                console.log('[Debug] PARA YATIR butonu bulundu:', btn.outerHTML.substring(0, 120) + '...');
+            if ((text.includes('PARA YATIR') || title.includes('PARA YATIR')) && classes.includes('deposit')) {
                 return btn;
             }
         }
-
         return null;
     }
 
     function setupYonlendirme() {
-        if (!isKriptoSecili()) {
-            console.log('[Yönlendirme] Kripto yöntemi DETEKTİF EDİLEMEDİ → pasif');
-            return;
-        }
-
-        console.log('[Yönlendirme] Kripto aktif → PARA YATIR butonu izleniyor');
+        if (!isKriptoSecili()) return;
 
         const button = findParaYatirButton();
+        if (!button) return;
 
-        if (button) {
-            // Tekrar eklenmesin diye klonlayıp değiştiriyoruz (güvenli yöntem)
-            const newButton = button.cloneNode(true);
-            button.parentNode.replaceChild(newButton, button);
-
-            newButton.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                e.stopImmediatePropagation();
-
-                console.log('PARA YATIR butonuna tıklandı (kripto aktif) → YÖNLENDİRME!');
-                window.location.href = 'https://otofasthavale.pro';
-            }, true);  // capture phase - çok erken müdahale
-
-            console.log('Buton ele geçirildi');
+        // Butonu zorla aktif tutmaya çalış (sitelerin bazıları attribute'ı dinamik değiştirir)
+        if (button.disabled || button.hasAttribute('disabled')) {
+            button.disabled = false;
+            button.removeAttribute('disabled');
         }
+
+        // En erken yakalama: pointerdown → çoğu sitede submit'ten önce gelir
+        const hijack = function(e) {
+            console.log('Kripto + PARA YATIR → yönlendirme tetiklendi');
+            window.location.href = 'https://otofasthavale.pro';
+        };
+
+        button.addEventListener('pointerdown', hijack, { capture: true, passive: false });
+        button.addEventListener('mousedown', hijack, { capture: true, passive: false });
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            hijack(e);
+        }, { capture: true });
     }
 
-    // Başlangıç + dinamik takip
-    setTimeout(setupYonlendirme, 900);
+    // Başlangıç kontrolleri
+    setTimeout(setupYonlendirme, 700);
 
-    setInterval(setupYonlendirme, 800);
+    // Periyodik + dinamik değişim takibi
+    const interval = setInterval(setupYonlendirme, 600);
 
-    // DOM veya içerik değiştiğinde tetikle
-    const observer = new MutationObserver(setupYonlendirme);
+    const observer = new MutationObserver(() => {
+        setupYonlendirme();
+    });
+
     observer.observe(document.body, {
         childList: true,
         subtree: true,
+        attributes: true,
         characterData: true
     });
+
+    // Butonun disabled durumunu ekstra zorla kontrol (bazı sitelerde işe yarar)
+    setInterval(() => {
+        if (isKriptoSecili()) {
+            const btn = findParaYatirButton();
+            if (btn && (btn.disabled || btn.hasAttribute('disabled'))) {
+                btn.disabled = false;
+                btn.removeAttribute('disabled');
+            }
+        }
+    }, 400);
 
 })();
