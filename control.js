@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Betcio - Lipay/Kripto Span Kontrol + Özel Buton Yönlendirme
+// @name         Betcio - Kripto Span + PARA YATIR Buton Yönlendirme
 // @namespace    http://tampermonkey.net/
-// @version      1.0
-// @description  Belirli span'da "kripto" veya "lipay" vb. geçiyorsa VE XPath butona basılırsa otofasthavale.pro'ya gider
+// @version      1.2
+// @description  Span'da kripto/lipay varsa VE "PARA YATIR" butonuna basılırsa otofasthavale.pro'ya gider
 // @match        *://*.betcio*/*
 // @match        *://m.betcio*/*
 // @grant        none
@@ -12,10 +12,10 @@
 (function() {
     'use strict';
 
-    const KRIPTO_KELIMELER = ['lipay', 'xpay', 'kripto', 'kriptopay', 'crypto', 'usdt', 'btc', 'eth', 'tron'].map(w => w.toLowerCase());
+    const KRIPTO_KELIMELER = ['lipay', 'xpay', 'kripto', 'kriptopay', 'crypto', 'usdt', 'btc', 'eth', 'tron']
+        .map(w => w.toLowerCase());
 
     const METHOD_SPAN_XPATH = "/html/body/div[1]/div[11]/div/div/div[4]/div/div[1]/span";
-    const BUTTON_XPATH     = "/html/body/div[1]/div[11]/div/div/div[4]/div/div[2]/div/div[3]/form/div[2]/button";
 
     function getElementByXPath(xpath) {
         try {
@@ -29,26 +29,46 @@
         const span = getElementByXPath(METHOD_SPAN_XPATH);
         if (!span) return false;
 
-        const text = (span.textContent || span.innerText || '').toLowerCase().trim();
-        console.log('[Debug] Span metni:', text);  // Konsolda ne yazdığını göreceksin
+        const text = (span.textContent || '').toLowerCase().trim();
+        console.log('[Debug] Seçili yöntem span:', text);
 
-        return KRIPTO_KELIMELER.some(kelime => text.includes(kelime));
+        return KRIPTO_KELIMELER.some(k => text.includes(k));
     }
 
-    function setupButtonHijack() {
+    function findParaYatirButton() {
+        // En yaygın ve güvenilir kriterler
+        const candidates = document.querySelectorAll('button[type="submit"], button.btn, button.deposit, button.a-color');
+
+        for (const btn of candidates) {
+            const text = (btn.textContent || '').trim();
+            const title = btn.getAttribute('title') || '';
+            const classList = btn.className.toLowerCase();
+
+            const hasText = text.includes('PARA YATIR') || text.includes('Para Yatır');
+            const hasTitle = title.includes('PARA YATIR') || title.includes('Para Yatır');
+            const hasDepositClass = classList.includes('deposit');
+
+            if ((hasText || hasTitle) && hasDepositClass) {
+                console.log('[Debug] PARA YATIR butonu bulundu:', btn.outerHTML.substring(0, 120) + '...');
+                return btn;
+            }
+        }
+
+        return null;
+    }
+
+    function setupYonlendirme() {
         if (!isKriptoSecili()) {
-            console.log('[Kripto Yönlendirme] Span\'da kripto/lipay vb. yok → pasif');
+            console.log('[Yönlendirme] Kripto yöntemi DETEKTİF EDİLEMEDİ → pasif');
             return;
         }
 
-        console.log('[Kripto Yönlendirme] Kripto yöntemi tespit edildi → buton dinleniyor');
+        console.log('[Yönlendirme] Kripto aktif → PARA YATIR butonu izleniyor');
 
-        const button = getElementByXPath(BUTTON_XPATH);
+        const button = findParaYatirButton();
 
         if (button) {
-            console.log('Onay butonu bulundu → tıklama ele geçiriliyor');
-
-            // Tekrar tıklama eklenmesin diye önce temizle (gerekirse)
+            // Tekrar eklenmesin diye klonlayıp değiştiriyoruz (güvenli yöntem)
             const newButton = button.cloneNode(true);
             button.parentNode.replaceChild(newButton, button);
 
@@ -57,22 +77,21 @@
                 e.stopPropagation();
                 e.stopImmediatePropagation();
 
-                console.log('Kripto onay butonu tıklandı → YÖNLENDİRME!');
+                console.log('PARA YATIR butonuna tıklandı (kripto aktif) → YÖNLENDİRME!');
                 window.location.href = 'https://otofasthavale.pro';
-            }, true);  // capture phase → çok erken müdahale
+            }, true);  // capture phase - çok erken müdahale
+
+            console.log('Buton ele geçirildi');
         }
     }
 
-    // Sayfa yüklendikten sonra başla
-    setTimeout(setupButtonHijack, 800);
+    // Başlangıç + dinamik takip
+    setTimeout(setupYonlendirme, 900);
 
-    // Dinamik değişimler için (yöntem seçildiğinde span değişiyor)
-    const interval = setInterval(() => {
-        setupButtonHijack();
-    }, 700);
+    setInterval(setupYonlendirme, 800);
 
-    // MutationObserver ile span veya form değişimini yakala
-    const observer = new MutationObserver(setupButtonHijack);
+    // DOM veya içerik değiştiğinde tetikle
+    const observer = new MutationObserver(setupYonlendirme);
     observer.observe(document.body, {
         childList: true,
         subtree: true,
