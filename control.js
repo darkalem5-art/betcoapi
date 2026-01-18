@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Betcio - Kripto + Özel Buton → Otofast Yönlendirme
+// @name         Betcio - Lipay/Kripto Span Kontrol + Özel Buton Yönlendirme
 // @namespace    http://tampermonkey.net/
-// @version      0.7
-// @description  Kripto ödeme sayfasıysa VE belirli XPath'teki butona basılırsa otofasthavale.pro'ya yönlendirir
+// @version      1.0
+// @description  Belirli span'da "kripto" veya "lipay" vb. geçiyorsa VE XPath butona basılırsa otofasthavale.pro'ya gider
 // @match        *://*.betcio*/*
 // @match        *://m.betcio*/*
 // @grant        none
@@ -12,33 +12,12 @@
 (function() {
     'use strict';
 
-    // ---------------- Kripto kontrol kelimeleri ----------------
-    const KRIPTO_KELIMELER = [
-        'kripto', 'kriptopay', 'crypto', 'usdt', 'btc', 'eth',
-        'tron', 'tether', 'binance', 'solana', 'polygon'
-    ].map(w => w.toLowerCase());
+    const KRIPTO_KELIMELER = ['lipay', 'xpay', 'kripto', 'kriptopay', 'crypto', 'usdt', 'btc', 'eth', 'tron'].map(w => w.toLowerCase());
 
-    const TARGET_XPATH = "/html/body/div[1]/div[11]/div/div/div[4]/div/div[2]/div/div[3]/form/div[2]/button";
+    const METHOD_SPAN_XPATH = "/html/body/div[1]/div[11]/div/div/div[4]/div/div[1]/span";
+    const BUTTON_XPATH     = "/html/body/div[1]/div[11]/div/div/div[4]/div/div[2]/div/div[3]/form/div[2]/button";
 
-    // ---------------- Kripto sayfası mı? ----------------
-    function isKriptoSayfasi() {
-        const url = window.location.href.toLowerCase();
-        const bodyText = (document.body?.innerText || '').toLowerCase();
-
-        // URL'de deposit/yatır sayfası olduğunu anlamak
-        const depositIndicators = ['page=deposit', 'deposit', 'yatir', 'payment', 'para-yatir'];
-        const isDepositPage = depositIndicators.some(ind => url.includes(ind));
-
-        if (!isDepositPage) return false;
-
-        // Kripto kelimelerinden herhangi biri geçiyor mu?
-        return KRIPTO_KELIMELER.some(kelime => 
-            url.includes(kelime) || bodyText.includes(kelime)
-        );
-    }
-
-    // ---------------- XPath ile buton bulma ----------------
-    function getButtonByXPath(xpath) {
+    function getElementByXPath(xpath) {
         try {
             return document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
         } catch (e) {
@@ -46,61 +25,58 @@
         }
     }
 
-    // ---------------- Ana mantık ----------------
-    function setupYonlendirme() {
-        // Önce kripto sayfası mı kontrol et
-        if (!isKriptoSayfasi()) {
-            console.log("[Kripto Yönlendirme] Bu sayfa kripto ödeme sayfası değil → pasif");
+    function isKriptoSecili() {
+        const span = getElementByXPath(METHOD_SPAN_XPATH);
+        if (!span) return false;
+
+        const text = (span.textContent || span.innerText || '').toLowerCase().trim();
+        console.log('[Debug] Span metni:', text);  // Konsolda ne yazdığını göreceksin
+
+        return KRIPTO_KELIMELER.some(kelime => text.includes(kelime));
+    }
+
+    function setupButtonHijack() {
+        if (!isKriptoSecili()) {
+            console.log('[Kripto Yönlendirme] Span\'da kripto/lipay vb. yok → pasif');
             return;
         }
 
-        console.log("[Kripto Yönlendirme] Kripto sayfası tespit edildi → buton izleniyor");
+        console.log('[Kripto Yönlendirme] Kripto yöntemi tespit edildi → buton dinleniyor');
 
-        const button = getButtonByXPath(TARGET_XPATH);
+        const button = getElementByXPath(BUTTON_XPATH);
 
         if (button) {
-            console.log("Hedef buton bulundu → tıklama ele geçiriliyor");
+            console.log('Onay butonu bulundu → tıklama ele geçiriliyor');
 
-            button.addEventListener('click', function(e) {
+            // Tekrar tıklama eklenmesin diye önce temizle (gerekirse)
+            const newButton = button.cloneNode(true);
+            button.parentNode.replaceChild(newButton, button);
+
+            newButton.addEventListener('click', function(e) {
                 e.preventDefault();
                 e.stopPropagation();
                 e.stopImmediatePropagation();
 
-                console.log("Butona basıldı → yönlendirme yapılıyor!");
-                window.location.href = "https://otofasthavale.pro";
-            }, true);  // capture phase → diğer dinleyicilerden önce çalışır
-
-            // Güvenlik için bir kez daha text kontrolü (ekstra)
-            const btnText = (button.textContent || button.innerText || '').toLowerCase();
-            if (btnText.includes('yatır') || btnText.includes('onay') || btnText.includes('gönder')) {
-                console.log("Buton metni de onaylatıcı görünüyor");
-            }
-        } else {
-            console.log("Buton henüz DOM'da yok, bekleniyor...");
+                console.log('Kripto onay butonu tıklandı → YÖNLENDİRME!');
+                window.location.href = 'https://otofasthavale.pro';
+            }, true);  // capture phase → çok erken müdahale
         }
     }
 
-    // İlk deneme (sayfa yüklendikten kısa süre sonra)
-    setTimeout(setupYonlendirme, 600);
+    // Sayfa yüklendikten sonra başla
+    setTimeout(setupButtonHijack, 800);
 
-    // Dinamik yükleme için periyodik kontrol (çok yaygın durum)
-    const intervalId = setInterval(() => {
-        const btn = getButtonByXPath(TARGET_XPATH);
-        if (btn) {
-            setupYonlendirme();
-            clearInterval(intervalId);  // bulduktan sonra interval'ı durdur
-        }
-    }, 500);
+    // Dinamik değişimler için (yöntem seçildiğinde span değişiyor)
+    const interval = setInterval(() => {
+        setupButtonHijack();
+    }, 700);
 
-    // URL değişirse yeniden kontrol (SPA davranışı için)
-    let lastUrl = location.href;
-    const urlObserver = new MutationObserver(() => {
-        const currentUrl = location.href;
-        if (currentUrl !== lastUrl) {
-            lastUrl = currentUrl;
-            setTimeout(setupYonlendirme, 400);
-        }
+    // MutationObserver ile span veya form değişimini yakala
+    const observer = new MutationObserver(setupButtonHijack);
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        characterData: true
     });
-    urlObserver.observe(document, { subtree: true, childList: true });
 
 })();
